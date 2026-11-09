@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14130f" media="(prefers-color-scheme: dark)">
+<title>Inventario y ganancias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f4ef;--card:#fffdf9;--sunk:#efece4;--ink:#1d1b16;--mute:#625d53;--line:#e4dfd3;--line2:#d5cfc1;
+  --cost:#a8430e;--cost-bg:#fbeee5;--gain:#0d6f53;--gain-bg:#e3f3ec;--acc:#26357f;--acc-ink:#fff;--acc-bg:#e8ebf8;
+  --r:14px;--r-sm:9px;--sh:0 1px 2px rgba(29,27,22,.05),0 6px 20px -8px rgba(29,27,22,.12);
+  --ease:cubic-bezier(.16,1,.3,1);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#14130f;--card:#1d1c17;--sunk:#24221c;--ink:#f1ede4;--mute:#aaa494;--line:#322f27;--line2:#45412f;
+  --cost:#f2a06c;--cost-bg:#3a2518;--gain:#62cfa6;--gain-bg:#16322a;--acc:#a9b8ff;--acc-ink:#121636;--acc-bg:#262c4d;
+  --sh:0 1px 2px rgba(0,0,0,.3),0 8px 24px -10px rgba(0,0,0,.6);color-scheme:dark;
+}}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scrollbar-color:var(--line2) transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Bricolage Grotesque',system-ui,sans-serif;font-optical-sizing:auto;font-size:16px;line-height:1.5;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);caret-color:var(--acc)}
+::selection{background:var(--acc);color:var(--acc-ink)}
+.num,td,input[type=number],.stat b,.big{font-variant-numeric:tabular-nums}
+svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Barra superior */
+.top{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1120px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{font-weight:800;font-size:1.05rem;letter-spacing:-.01em;margin-right:auto}
+.sync{display:inline-flex;align-items:center;gap:8px;font-size:.85rem;color:var(--mute);padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card)}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--mute)}
+.sync[data-s=live] i{background:var(--gain);box-shadow:0 0 0 3px var(--gain-bg)}
+.sync[data-s=saving] i{background:var(--acc);animation:pulse 1s var(--ease) infinite alternate}
+.sync[data-s=error] i{background:var(--cost)}
+@keyframes pulse{to{opacity:.3}}
+
+main{max-width:1120px;margin:0 auto;padding:28px 20px 64px}
+h1{font-size:clamp(1.9rem,4.5vw,2.75rem);font-weight:800;letter-spacing:-.035em;line-height:1.05;margin:0 0 8px;text-wrap:balance}
+.lede{color:var(--mute);margin:0 0 28px;max-width:60ch}
+h2{font-size:1.2rem;font-weight:700;letter-spacing:-.015em;margin:0}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:44px 0 14px;flex-wrap:wrap}
+.sec-h p{margin:0;color:var(--mute);font-size:.9rem}
+
+/* Botones */
+.btn{font:inherit;font-weight:600;font-size:.92rem;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border-radius:var(--r-sm);cursor:pointer;
+  border:1px solid var(--line2);background:var(--card);color:var(--ink);transition:background .2s var(--ease),border-color .2s var(--ease),transform .15s var(--ease)}
+.btn:hover{border-color:var(--ink)}
+.btn:active{transform:translateY(1px)}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:none;color:var(--mute)}
+.btn.ghost:hover{color:var(--ink);background:var(--sunk)}
+.btn.warn{color:var(--cost);border-color:var(--cost)}
+.btn[disabled]{opacity:.55;cursor:progress}
+.dl{display:flex;gap:8px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+/* Resumen */
+.recover{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:24px 24px 0;overflow:hidden}
+.rec-top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px 32px;flex-wrap:wrap}
+.rec-top small{display:block;color:var(--mute);font-size:.88rem;margin-bottom:2px}
+.big{font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.04em;line-height:1}
+.big .of{font-size:.42em;font-weight:500;color:var(--mute);letter-spacing:-.01em;margin-left:4px}
+.rec-side{text-align:right}
+.rec-side b{font-size:1.35rem;font-weight:800;letter-spacing:-.02em}
+.rec-side.done b{color:var(--gain)}
+.bar{position:relative;height:10px;background:var(--sunk);border-radius:6px;margin:20px 0 10px;overflow:hidden}
+.bar>i{position:absolute;inset:0 auto 0 0;width:100%;background:var(--gain);border-radius:6px;transform-origin:left;transform:scaleX(0);transition:transform .6s var(--ease)}
+.rec-msg{color:var(--mute);font-size:.92rem;margin:0 0 20px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);margin:0 -24px;border-top:1px solid var(--line);background:var(--sunk)}
+.stat{padding:14px 24px;border-left:1px solid var(--line)}
+.stat:first-child{border-left:0}
+.stat dt{color:var(--mute);font-size:.82rem}
+.stat dd{margin:2px 0 0}
+.stat b{font-size:1.25rem;font-weight:800;letter-spacing:-.02em}
+.stat.c b{color:var(--cost)}.stat.g b{color:var(--gain)}
+@media (max-width:760px){.stats{grid-template-columns:1fr 1fr}.stat:nth-child(3){border-left:0}.stat:nth-child(n+3){border-top:1px solid var(--line)}.rec-side{text-align:left}}
+
+/* Tabla de productos */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh)}
+.tw{overflow-x:auto;border-radius:var(--r)}
+table{border-collapse:collapse;width:100%}
+th,td{padding:12px 8px;text-align:right;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+th{font-weight:600;color:var(--mute);font-size:.8rem;background:var(--sunk);position:sticky;top:0}
+th:first-child,td:first-child{text-align:left;padding-left:18px}
+th:last-child,td:last-child{padding-right:14px}
+#rows tr{transition:background .2s}
+#rows tr:hover{background:color-mix(in srgb,var(--sunk) 55%,transparent)}
+tfoot td{font-weight:800;border-bottom:0;background:var(--sunk)}
+input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%;min-height:38px;text-align:right;transition:border-color .2s var(--ease),background .2s}
+input:hover{border-color:var(--line2)}
+input:focus{border-color:var(--acc);background:var(--card);outline:none;box-shadow:0 0 0 3px var(--acc-bg)}
+input::placeholder{color:var(--mute);opacity:1}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.w-nm{min-width:150px}
+input.nm{text-align:left;font-weight:600;border-color:transparent;background:transparent}
+input.nm:hover{border-color:var(--line)}
+.w-n{width:92px}
+.stepper{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:9px;background:var(--bg);overflow:hidden}
+.stepper input{border:0;border-radius:0;width:50px;text-align:center;background:transparent;min-height:36px;padding:0 4px}
+.stepper input:focus{box-shadow:none;background:var(--card)}
+.stepper:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-bg)}
+.stp{font:inherit;width:30px;display:grid;place-items:center;border:0;background:none;color:var(--mute);cursor:pointer;transition:background .15s,color .15s}
+.stp:hover{background:var(--sunk);color:var(--ink)}
+.stp svg.i{width:15px;height:15px}
+.chips{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;margin-top:6px}
+.chip{font:inherit;font-size:.75rem;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--mute);border-radius:999px;padding:3px 9px;cursor:pointer;transition:all .15s var(--ease)}
+.chip:hover{color:var(--ink);border-color:var(--line2)}
+.chip.on{background:var(--acc-bg);color:var(--acc);border-color:transparent;font-weight:600}
+.pos{color:var(--gain);font-weight:700}.neg{color:var(--cost);font-weight:700}
+.tk{font-weight:700}
+.del{display:grid;place-items:center;width:36px;height:36px;border-radius:8px;border:0;background:none;color:var(--mute);cursor:pointer;font:inherit;font-size:.8rem;font-weight:600;white-space:nowrap}
+.del:hover{background:var(--cost-bg);color:var(--cost)}
+.del.arm{width:auto;padding:0 10px;background:var(--cost);color:#fff}
+.empty{padding:40px 20px;text-align:center;color:var(--mute)}
+
+@media (max-width:1040px){
+  #tblW{overflow:visible}
+  #tbl thead,#tbl tfoot{display:none}
+  #tbl,#tbl tbody{display:block}
+  #rows tr{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;padding:14px 14px 10px;border-bottom:1px solid var(--line)}
+  #rows tr:last-child{border-bottom:0}
+  #rows tr:hover{background:none}
+  #rows td{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:6px 0;border:0;text-align:left;white-space:normal}
+  #rows td::before{content:attr(data-label);color:var(--mute);font-size:.78rem}
+  #rows td.c-nm{grid-column:1/-1;flex-direction:row;align-items:center}
+  #rows td.c-nm::before{display:none}
+  #rows td.c-nm input{font-size:1.1rem;font-weight:800;padding-left:0}
+  #rows td.c-out{font-size:1.05rem}
+  #rows td.c-del{display:none}
+  #rows td .del-m{display:inline-grid}
+  .chips{justify-content:flex-start}
+  .w-n,.stepper{width:100%}
+  .stepper input{flex:1}
+  .stp{width:44px}
+  input,.stepper input{min-height:44px}
+  .mtot{display:grid}
+}
+.del-m{display:none}
+.mtot{display:none;grid-template-columns:1fr 1fr;gap:8px 12px;padding:14px;background:var(--sunk);border-top:1px solid var(--line);border-radius:0 0 var(--r) var(--r);font-size:.9rem}
+.mtot b{display:block;font-size:1.05rem}
+
+/* Stickers */
+.st-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:18px}
+@media (max-width:760px){.st-grid{grid-template-columns:1fr 1fr}}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:.85rem;color:var(--mute);font-weight:500}
+label.f input{text-align:left;color:var(--ink)}
+.st-t{border-top:1px solid var(--line)}
+.st-t th{position:static}
+.st-foot{display:flex;gap:8px 28px;flex-wrap:wrap;padding:14px 18px;color:var(--mute);font-size:.92rem;border-top:1px solid var(--line)}
+.st-foot b{color:var(--ink)}
+
+/* Agregar */
+.add-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:14px;align-items:end;padding:18px}
+@media (max-width:760px){.add-grid{grid-template-columns:1fr 1fr}.add-grid .f:first-child,.add-grid .btn{grid-column:1/-1}}
+
+.foot{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:44px;padding-top:20px;border-top:1px solid var(--line)}
+.foot .sp{flex:1}
+.note{color:var(--mute);font-size:.85rem;margin:14px 0 0;max-width:75ch}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:.92rem;font-weight:500;box-shadow:0 8px 30px -8px rgba(0,0,0,.35);transition:opacity .25s var(--ease),transform .35s var(--ease);z-index:50;max-width:calc(100vw - 32px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+@media print{.top,.foot,#nf,.chips,.stp,.del{display:none!important}body{background:#fff}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8M12 11v8"/></symbol>
+  <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 18h4M9 12h2"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></symbol>
+  <symbol id="i-row" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M12 14v4M10 16h4"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="top-in">
+    <span class="brand">Inventario</span>
+    <span class="sync" id="sync" data-s="local" role="status" aria-live="polite"><i></i><span id="syncTxt">Solo en este dispositivo</span></span>
+    <div class="dl">
+      <button class="btn pri" data-x="xlsx"><svg class="i"><use href="#i-sheet"/></svg>Excel</button>
+      <button class="btn" data-x="pdf"><svg class="i"><use href="#i-pdf"/></svg>PDF</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <h1>Inventario y ganancias</h1>
+  <p class="lede">Cargá cantidad, costo y precio de cada producto. Todo se calcula solo y se guarda automáticamente para todo el equipo.</p>
+
+  <section class="recover" aria-labelledby="recT">
+    <div class="rec-top">
+      <div>
+        <small id="recT">Cobrado hasta ahora</small>
+        <div class="big"><span id="pCash"></span><span class="of" id="pOf"></span></div>
+      </div>
+      <div class="rec-side" id="pSide"><small id="pSideL"></small><b id="pSideV"></b></div>
+    </div>
+    <div class="bar" role="progressbar" aria-label="Costo cubierto" aria-valuemin="0" aria-valuemax="100" id="pBarW"><i id="pBar"></i></div>
+    <p class="rec-msg" id="pTxt"></p>
+    <dl class="stats">
+      <div class="stat c"><dt>Hay que cubrir (costo total)</dt><dd><b id="sCost"></b></dd></div>
+      <div class="stat"><dt>Ingreso si vendés todo</dt><dd><b id="sRev"></b></dd></div>
+      <div class="stat g"><dt>Ganancia posible</dt><dd><b id="sGain"></b></dd></div>
+      <div class="stat"><dt>Margen</dt><dd><b id="sMar"></b></dd></div>
+    </dl>
+  </section>
+
+  <div class="sec-h"><h2>Productos</h2><p id="cnt"></p></div>
+  <div class="panel">
+    <div class="tw" id="tblW">
+      <table id="tbl">
+        <thead><tr><th>Producto</th><th>Cantidad</th><th>Costo c/u</th><th>Costo total</th><th>Precio c/u</th><th>Ingreso</th><th>Ganancia</th><th>Vendidos</th><th>Quedan</th><th><span class="sr">Acciones</span></th></tr></thead>
+        <tbody id="rows"></tbody>
+        <tfoot><tr><td>Total</td><td id="tQ"></td><td></td><td id="tC"></td><td></td><td id="tR"></td><td id="tG"></td><td id="tS"></td><td id="tK"></td><td></td></tr></tfoot>
+      </table>
+    </div>
+    <div class="mtot" aria-hidden="true">
+      <div>Costo total<b id="mC"></b></div><div>Ingreso<b id="mR"></b></div>
+      <div>Ganancia<b id="mG"></b></div><div>Vendidos / quedan<b id="mSK"></b></div>
+    </div>
+  </div>
+
+  <section id="stBox">
+    <div class="sec-h"><h2>Ventas de stickers y promos</h2><p>Los vendidos de stickers se cargan acá.</p></div>
+    <div class="panel">
+      <div class="st-grid">
+        <label class="f">Planchas sueltas vendidas<input type="number" inputmode="numeric" id="stInd" min="0"></label>
+        <label class="f">Promos vendidas (2 planchas)<input type="number" inputmode="numeric" id="stPro" min="0"></label>
+        <label class="f">Precio suelto c/u<input type="number" inputmode="decimal" id="stPi" min="0"></label>
+        <label class="f">Precio de la promo (por las 2)<input type="number" inputmode="decimal" id="stPp" min="0"></label>
+      </div>
+      <div class="tw st-t">
+        <table>
+          <thead><tr><th>Tipo de venta</th><th>Cantidad</th><th>Planchas</th><th>Cobrado</th><th>Ganancia</th><th>Ganancia por plancha</th></tr></thead>
+          <tbody id="stRows"></tbody>
+        </table>
+      </div>
+      <div class="st-foot" id="stFoot"></div>
+    </div>
+  </section>
+
+  <section id="nf">
+    <div class="sec-h"><h2>Agregar producto</h2></div>
+    <form class="panel add-grid" id="addForm" autocomplete="off">
+      <label class="f">Nombre<input id="nN" placeholder="Ej: Tazas" required></label>
+      <label class="f">Cantidad<input type="number" inputmode="decimal" id="nQ" min="0" placeholder="0"></label>
+      <label class="f">Costo c/u<input type="number" inputmode="decimal" id="nC" min="0" placeholder="$0"></label>
+      <label class="f">Precio de venta c/u<input type="number" inputmode="decimal" id="nP" min="0" placeholder="$0"></label>
+      <button class="btn pri" type="submit"><svg class="i"><use href="#i-plus"/></svg>Agregar</button>
+    </form>
+  </section>
+
+  <div class="foot">
+    <button class="btn" id="add"><svg class="i"><use href="#i-row"/></svg>Agregar fila vacía</button>
+    <span class="sp"></span>
+    <button class="btn ghost" id="reset"><svg class="i"><use href="#i-undo"/></svg><span>Volver a la lista original</span></button>
+  </div>
+  <p class="note">Supuestos: los stickers cuestan $250.000 en total (≈ $1.471 por plancha). Los precios en pack se calculan por unidad (2 × $5.000 = $2.500 c/u). Todo se puede editar.</p>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
+
+<script type="module">
+/* =====================================================================
+   BASE COMPARTIDA (Firebase Firestore)
+   Pegá acá la configuración de tu proyecto de Firebase (ver README).
+   Si lo dejás vacío, la página funciona igual pero guarda solo en este
+   dispositivo.
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};
+// Nombre del inventario compartido. Todos los que abran la página ven este mismo.
+const INVENTARIO_ID = "principal";
+/* ===================================================================== */
+
+const KEY='inv-ganancias-v1';
+const ME=Math.random().toString(36).slice(2);
+const orig=()=>[
+ {n:'Llaveros',q:227,c:1300,p:5000,s:0,o:[]},
+ {n:'Cuadritos',q:3,c:8000,p:18000,s:0,o:[]},
+ {n:'Remeras adulto',q:19,c:10000,p:30000,s:0,o:[{l:'$30.000',u:30000},{l:'$25.000',u:25000}]},
+ {n:'Stickers (planchas)',q:170,c:250000/170,p:10000,s:0,pk:true,o:[{l:'$10.000 c/u',u:10000},{l:'2 × $15.000',u:7500}]},
+ {n:'Imanes',q:123,c:500,p:2500,s:0,o:[{l:'2 × $5.000',u:2500}]}
+];
+
+let D;
+try{D=JSON.parse(localStorage.getItem(KEY))}catch(e){D=null}
+if(!Array.isArray(D)||!D.length)D=orig();
+const norm=()=>D.forEach(d=>{if(/^stickers/i.test(d.n||''))d.pk=true;d.o=d.o||[];['q','c','p','s'].forEach(k=>d[k]=+d[k]||0)});
+norm();
+
+const $=id=>document.getElementById(id);
+const isSt=d=>d&&(d.pk||/^stickers/i.test(d.n||''));
+const stIdx=()=>D.findIndex(isSt);
+const isMainSt=d=>isSt(d)&&D.indexOf(d)===stIdx();
+const stPi=d=>d.pi==null?10000:d.pi, stPp=d=>d.pp==null?15000:d.pp;
+const m=n=>(n<0?'-$':'$')+Math.abs(Math.round(n)).toLocaleString('es-AR');
+const nf=n=>Math.round(n).toLocaleString('es-AR');
+const num=v=>Math.max(0,parseFloat(v)||0);
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const ic=(id)=>`<svg class="i" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+
+let tT;
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(tT);tT=setTimeout(()=>e.classList.remove('on'),2600)}
+function setSync(s,t){$('sync').dataset.s=s;$('syncTxt').textContent=t}
+
+/* ---------- Render ---------- */
+function stepper(f,val,label,attrs=''){
+  return `<span class="stepper"><button type="button" class="stp" data-step="${f}" data-d="-1" aria-label="Restar uno a ${label}">${ic('minus')}</button><input type="number" inputmode="numeric" data-f="${f}" value="${val}" aria-label="${label}" ${attrs}><button type="button" class="stp" data-step="${f}" data-d="1" aria-label="Sumar uno a ${label}">${ic('plus')}</button></span>`;
+}
+function rowHTML(d,i){
+  const chips=d.o.map((o,j)=>`<button type="button" class="chip ${Math.abs(d.p-o.u)<.01?'on':''}" data-j="${j}">${esc(o.l)}</button>`).join('');
+  const st=isMainSt(d);
+  return `<tr data-i="${i}">
+  <td class="c-nm"><input class="nm w-nm" data-f="n" value="${esc(d.n)}" aria-label="Nombre del producto"><button type="button" class="del del-m" data-del aria-label="Borrar ${esc(d.n)}">${ic('trash')}</button></td>
+  <td data-label="Cantidad">${stepper('q',d.q,'Cantidad')}</td>
+  <td data-label="Costo c/u"><input class="w-n" type="number" inputmode="decimal" data-f="c" value="${Math.round(d.c*100)/100}" aria-label="Costo por unidad"></td>
+  <td data-label="Costo total" class="tc c-out"></td>
+  <td data-label="Precio c/u"><input class="w-n" type="number" inputmode="decimal" data-f="p" value="${Math.round(d.p*100)/100}" aria-label="Precio por unidad">${chips?`<div class="chips">${chips}</div>`:''}</td>
+  <td data-label="Ingreso" class="tr c-out"></td>
+  <td data-label="Ganancia" class="tg c-out"></td>
+  <td data-label="Vendidos">${stepper('s',d.s,'Vendidos',st?'title="Total de planchas vendidas (sueltas + 2 por cada promo). Las promos se cargan en el cuadro de stickers."':'')}</td>
+  <td data-label="Quedan" class="tk c-out"></td>
+  <td class="c-del"><button type="button" class="del" data-del aria-label="Borrar ${esc(d.n)}">${ic('trash')}</button></td></tr>`;
+}
+function build(){
+  // conserva el foco si el usuario está escribiendo
+  const a=document.activeElement,tr=a&&a.closest&&a.closest('#rows tr');
+  const keep=tr?{i:tr.dataset.i,f:a.dataset.f,s:a.selectionStart,e:a.selectionEnd}:null;
+  $('rows').innerHTML=D.length?D.map(rowHTML).join(''):`<tr><td colspan="10" class="empty">No hay productos. Agregá uno abajo.</td></tr>`;
+  if(keep&&keep.f){const el=document.querySelector(`#rows tr[data-i="${keep.i}"] [data-f="${keep.f}"]`);if(el){el.focus();try{el.setSelectionRange(keep.s,keep.e)}catch(e){}}}
+  fillPanel();calc();
+}
+function setIf(el,v){if(el&&document.activeElement!==el&&el.value!=String(v))el.value=v}
+
+function calc(){
+  let C=0,R=0,Q=0,S=0,K=0,cash=0;
+  D.forEach((d,i)=>{
+    const tr=document.querySelector(`#rows tr[data-i="${i}"]`);
+    const c=d.q*d.c,r=d.q*d.p,g=r-c;
+    C+=c;R+=r;Q+=d.q;
+    if(isMainSt(d)){d.s=(d.ind||0)+2*(d.pro||0);cash+=(d.ind||0)*stPi(d)+(d.pro||0)*stPp(d)}
+    else cash+=Math.min(d.s,d.q)*d.p;
+    S+=d.s;K+=d.q-d.s;
+    if(!tr)return;
+    setIf(tr.querySelector('[data-f="s"]'),d.s);
+    const tk=tr.querySelector('.tk');tk.textContent=nf(d.q-d.s);tk.className='tk c-out '+(d.q-d.s<0?'neg':'');
+    tr.querySelector('.tc').textContent=m(c);
+    tr.querySelector('.tr').textContent=m(r);
+    const tg=tr.querySelector('.tg');tg.textContent=m(g);tg.className='tg c-out '+(g>=0?'pos':'neg');
+  });
+  const G=R-C;
+  stPanel();
+  $('sCost').textContent=m(C);$('sRev').textContent=m(R);$('sGain').textContent=m(G);
+  $('sMar').textContent=R?Math.round(G/R*100)+'%':'0%';
+  $('tQ').textContent=nf(Q);$('tC').textContent=m(C);$('tR').textContent=m(R);$('tG').textContent=m(G);$('tS').textContent=nf(S);$('tK').textContent=nf(K);
+  $('mC').textContent=m(C);$('mR').textContent=m(R);$('mG').textContent=m(G);$('mSK').textContent=nf(S)+' / '+nf(K);
+  $('cnt').textContent=D.length+(D.length===1?' producto':' productos')+' · '+nf(Q)+' unidades';
+  const pct=C?Math.min(100,cash/C*100):0;
+  $('pBar').style.transform=`scaleX(${pct/100})`;$('pBarW').setAttribute('aria-valuenow',Math.round(pct));
+  $('pCash').textContent=m(cash);$('pOf').textContent='de '+m(C);
+  const done=cash>=C&&C>0;
+  $('pSide').className='rec-side'+(done?' done':'');
+  $('pSideL').textContent=done?'Ganancia real hasta ahora':'Falta para cubrir el costo';
+  $('pSideV').textContent=done?m(cash-C):m(C-cash);
+  $('pTxt').textContent=done?'¡Ya cubriste todo lo invertido! Desde acá, cada venta es ganancia.':`Llevás cubierto el ${Math.round(pct)}% del costo. Cargá los vendidos de cada producto.`;
+  save();
+}
+
+/* ---------- Stickers ---------- */
+function fillPanel(){
+  const d=D[stIdx()];$('stBox').hidden=!d;if(!d)return;
+  setIf($('stInd'),d.ind||0);setIf($('stPro'),d.pro||0);setIf($('stPi'),stPi(d));setIf($('stPp'),stPp(d));
+}
+function stPanel(){
+  const d=D[stIdx()];if(!d)return;
+  const ind=d.ind||0,pro=d.pro||0,u=ind+2*pro,pi=stPi(d),pp=stPp(d),cc=d.c||0;
+  const cash=ind*pi+pro*pp,dis=u*pi-cash,left=d.q-u;
+  setIf($('stInd'),ind);setIf($('stPro'),pro);
+  const gi=ind*pi-ind*cc,gp=pro*pp-2*pro*cc;
+  const gc=v=>`<td class="${v>=0?'pos':'neg'}">${m(v)}</td>`;
+  const sp=(k,v,l)=>`<span class="stepper"><button type="button" class="stp" data-k="${k}" data-d="-1" aria-label="Restar uno a ${l}">${ic('minus')}</button><input type="number" inputmode="numeric" data-k2="${k}" value="${v}" aria-label="${l}"><button type="button" class="stp" data-k="${k}" data-d="1" aria-label="Sumar uno a ${l}">${ic('plus')}</button></span>`;
+  const a=document.activeElement,focusK=a&&a.dataset&&a.dataset.k2;
+  $('stRows').innerHTML=`
+  <tr><td>Sueltas (${m(pi)} c/u)</td><td>${sp('ind',ind,'planchas sueltas')}</td><td>${ind}</td><td>${m(ind*pi)}</td>${gc(gi)}<td>${m(pi-cc)}</td></tr>
+  <tr><td>Promos (2 por ${m(pp)})</td><td>${sp('pro',pro,'promos')}</td><td>${2*pro}</td><td>${m(pro*pp)}</td>${gc(gp)}<td>${m(pp/2-cc)}</td></tr>
+  <tr><td><b>Total stickers</b></td><td></td><td><b>${u}</b></td><td><b>${m(cash)}</b></td>${gc(gi+gp)}<td></td></tr>`;
+  if(focusK){const el=$('stRows').querySelector(`[data-k2="${focusK}"]`);if(el){el.focus();const L=el.value.length;try{el.setSelectionRange(L,L)}catch(e){}}}
+  $('stFoot').innerHTML=`<span>Quedan <b class="${left<0?'neg':''}">${nf(left)}</b> planchas</span><span>Descuento dado por promos: <b>${m(dis)}</b></span>`;
+}
+
+/* ---------- Eventos ---------- */
+const rowOf=el=>D[+el.closest('tr').dataset.i];
+$('rows').addEventListener('input',e=>{
+  const f=e.target.dataset.f;if(!f)return;const d=rowOf(e.target);
+  if(f==='s'&&isMainSt(d)){d.ind=Math.max(0,num(e.target.value)-2*(d.pro||0));fillPanel();calc();return}
+  d[f]=f==='n'?e.target.value:num(e.target.value);
+  if(f==='p')e.target.closest('tr').querySelectorAll('.chip').forEach((c,j)=>c.classList.toggle('on',Math.abs(d.p-d.o[j].u)<.01));
+  calc();
+});
+$('rows').addEventListener('click',e=>{
+  const st=e.target.closest('[data-step]');
+  if(st){const tr=st.closest('tr'),d=rowOf(st),f=st.dataset.step,dl=+st.dataset.d;
+    if(f==='s'&&isMainSt(d)){d.ind=Math.max(0,(d.ind||0)+dl);fillPanel()}
+    else d[f]=Math.max(0,(d[f]||0)+dl);
+    tr.querySelector(`[data-f="${f}"]`).value=d[f];calc();return}
+  const ch=e.target.closest('.chip');
+  if(ch){const d=rowOf(ch);d.p=d.o[+ch.dataset.j].u;build();return}
+  const del=e.target.closest('[data-del]');
+  if(del){
+    if(del.classList.contains('arm')){const i=+del.closest('tr').dataset.i,n=D[i].n;D.splice(i,1);build();toast(`“${n}” borrado`)}
+    else{del.classList.add('arm');del.textContent='¿Borrar?';setTimeout(()=>{if(del.isConnected){del.classList.remove('arm');del.innerHTML=ic('trash')}},3000)}
+  }
+});
+[['stInd','ind'],['stPro','pro'],['stPi','pi'],['stPp','pp']].forEach(([id,k])=>$(id).addEventListener('input',e=>{const d=D[stIdx()];if(!d)return;d[k]=num(e.target.value);calc()}));
+$('stRows').addEventListener('input',e=>{const k=e.target.dataset.k2;if(!k)return;const d=D[stIdx()];d[k]=num(e.target.value);calc()});
+$('stRows').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b)return;const d=D[stIdx()];if(!d)return;const k=b.dataset.k;d[k]=Math.max(0,(d[k]||0)+(+b.dataset.d));calc()});
+$('addForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const n=$('nN').value.trim();if(!n){$('nN').focus();return}
+  D.push({n,q:num($('nQ').value),c:num($('nC').value),p:num($('nP').value),s:0,o:[]});
+  e.target.reset();build();
+  const last=document.querySelector('#rows tr:last-child');if(last)last.scrollIntoView({block:'center',behavior:'smooth'});
+  toast(`“${n}” agregado`);
+});
+$('add').onclick=()=>{D.push({n:'Nuevo producto',q:0,c:0,p:0,s:0,o:[]});build();const nl=document.querySelector('#rows tr:last-child .nm');if(nl){nl.focus();nl.select()}};
+$('reset').onclick=()=>{const b=$('reset'),t=b.querySelector('span');
+  if(b.dataset.arm){D=orig();build();delete b.dataset.arm;b.classList.remove('warn');t.textContent='Volver a la lista original';toast('Se restauró la lista original')}
+  else{b.dataset.arm=1;b.classList.add('warn');t.textContent='Tocá de nuevo: se borra todo para todos';setTimeout(()=>{delete b.dataset.arm;b.classList.remove('warn');t.textContent='Volver a la lista original'},4000)}};
+document.addEventListener('focusin',e=>{if(e.target.type==='number')try{e.target.select()}catch(x){}});
+
+/* ---------- Guardado (local + nube) ---------- */
+let fs=null,ref=null,tm=null,lastSent=0;
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}
+  if(!fs)return;
+  clearTimeout(tm);setSync('saving','Guardando…');
+  tm=setTimeout(async()=>{
+    lastSent=Date.now();
+    try{await fs.setDoc(ref,{items:JSON.parse(JSON.stringify(D)),t:lastSent,by:ME});setSync('live','Sincronizado')}
+    catch(e){console.error(e);setSync('error','Sin conexión · guardado acá')}
+  },600);
+}
+async function connect(){
+  if(!FIREBASE_CONFIG.apiKey||!FIREBASE_CONFIG.projectId){setSync('local','Solo en este dispositivo');return}
+  setSync('saving','Conectando…');
+  try{
+    const V='10.12.2';
+    const app=await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
+    const F=await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
+    const db=F.getFirestore(app.initializeApp(FIREBASE_CONFIG));
+    const r=F.doc(db,'inventarios',INVENTARIO_ID);
+    let first=true;
+    F.onSnapshot(r,snap=>{
+      if(snap.metadata.hasPendingWrites)return;
+      const x=snap.exists()?snap.data():null;
+      if(first){first=false;fs=F;ref=r;
+        if(!x||!Array.isArray(x.items)){save();return}   // primera vez: sube lo que hay
+      }
+      if(!x||!Array.isArray(x.items))return;
+      if(x.by===ME&&x.t===lastSent){setSync('live','Sincronizado');return}
+      D=x.items;norm();build();setSync('live','Sincronizado');
+    },err=>{console.error(err);setSync('error','No se pudo conectar · guardado acá')});
+  }catch(e){console.error(e);setSync('error','No se pudo conectar · guardado acá')}
+}
+
+/* ---------- Exportar ---------- */
+const NF='$#,##0;-$#,##0;-';
+const cl=(v,f,z)=>{const o={t:'n',v:v};if(f)o.f=f;if(z)o.z=z;return o};
+const fname=ext=>'inventario-'+new Date().toISOString().slice(0,10)+'.'+ext;
+function totals(){
+  let C=0,R=0,cash=0,Q=0,S=0,K=0;const si=stIdx();
+  const rows=D.map((d,i)=>{const isS=i===si,c=d.q*d.c,rv=d.q*d.p,cob=isS?(d.ind||0)*stPi(d)+(d.pro||0)*stPp(d):Math.min(d.s,d.q)*d.p;
+    C+=c;R+=rv;cash+=cob;Q+=d.q;S+=d.s;K+=d.q-d.s;return {d,isS,c,rv,cob}});
+  return {rows,C,R,cash,Q,S,K,si};
+}
+function exportXlsx(){
+  const X=window.XLSX;
+  if(!X){toast('No se pudo cargar el generador de Excel. Revisá la conexión.');return}
+  const T=totals(),n=D.length,tot=12+n,e=11+n;
+  const prod=T.rows.map(({d,isS,c,rv,cob},i)=>{const r=12+i;
+    return [d.n,cl(d.q),cl(d.c,null,NF),cl(c,'B'+r+'*C'+r,NF),cl(d.p,null,NF),cl(rv,'B'+r+'*E'+r,NF),cl(rv-c,'F'+r+'-D'+r,NF),cl(d.s),cl(d.q-d.s,'B'+r+'-H'+r),cl(cob,isS?null:'MIN(H'+r+',B'+r+')*E'+r,NF),cl(d.p-d.c,'E'+r+'-C'+r,NF),cl(d.p?(d.p-d.c)/d.p:0,'IF(E'+r+'=0,0,K'+r+'/E'+r+')','0%')]});
+  const sm=(L,v,z)=>cl(v,'SUM('+L+'12:'+L+e+')',z);
+  const A=[['Inventario y ganancias'],[],
+   ['Hay que cubrir (costo total)',cl(T.C,'D'+tot,NF)],
+   ['Ingreso si vendés todo',cl(T.R,'F'+tot,NF)],
+   ['Ganancia posible',cl(T.R-T.C,'G'+tot,NF)],
+   ['Margen',cl(T.R?(T.R-T.C)/T.R:0,'IF(B4=0,0,B5/B4)','0%')],
+   ['Cobrado hasta ahora',cl(T.cash,'J'+tot,NF)],
+   ['Falta para cubrir el costo',cl(Math.max(0,T.C-T.cash),'MAX(0,B3-B7)',NF)],
+   ['Resultado hasta ahora (cobrado menos costo)',cl(T.cash-T.C,'B7-B3',NF)],[],
+   ['Producto','Cantidad','Costo c/u','Costo total','Precio c/u','Ingreso','Ganancia','Vendidos','Quedan','Cobrado','Ganancia c/u','Margen']].concat(prod);
+  A.push(['Total',sm('B',T.Q),null,sm('D',T.C,NF),null,sm('F',T.R,NF),sm('G',T.R-T.C,NF),sm('H',T.S),sm('I',T.K),sm('J',T.cash,NF)]);
+  const wb=X.utils.book_new();
+  const w1=X.utils.aoa_to_sheet(A);
+  w1['!cols']=[{wch:40},{wch:12},{wch:12},{wch:14},{wch:12},{wch:15},{wch:15},{wch:11},{wch:11},{wch:14},{wch:13},{wch:10}];
+  X.utils.book_append_sheet(wb,w1,'Inventario');
+  const s=D[T.si];
+  if(s){const ind=s.ind||0,pro=s.pro||0,pi=stPi(s),pp=stPp(s),cc=s.c;
+    const B=[['Ventas de stickers y promos'],[],
+     ['Precio suelto por plancha',cl(pi,null,NF)],['Precio de la promo (2 planchas)',cl(pp,null,NF)],['Costo por plancha',cl(cc,null,NF)],[],
+     ['Tipo de venta','Cantidad','Planchas','Cobrado','Ganancia','Ganancia por plancha'],
+     ['Sueltas',cl(ind),cl(ind),cl(ind*pi,null,NF),cl(ind*(pi-cc),null,NF),cl(pi-cc,null,NF)],
+     ['Promos (2 planchas)',cl(pro),cl(2*pro),cl(pro*pp,null,NF),cl(pro*pp-2*pro*cc,null,NF),cl(pp/2-cc,null,NF)],
+     ['Total stickers',null,cl(ind+2*pro),cl(ind*pi+pro*pp,null,NF),cl(ind*(pi-cc)+pro*pp-2*pro*cc,null,NF)],[],
+     ['Planchas que quedan',cl(s.q-ind-2*pro)],['Descuento dado por promos',cl((ind+2*pro)*pi-(ind*pi+pro*pp),null,NF)]];
+    const w2=X.utils.aoa_to_sheet(B);w2['!cols']=[{wch:34},{wch:14},{wch:12},{wch:14},{wch:14},{wch:22}];
+    X.utils.book_append_sheet(wb,w2,'Stickers');}
+  const P=[['Producto','Opción de precio','Precio por unidad','Ganancia por unidad']];
+  D.forEach(d=>{if(d.o.length)d.o.forEach(o=>P.push([d.n,o.l,cl(o.u,null,NF),cl(o.u-d.c,null,NF)]));else P.push([d.n,'Precio actual',cl(d.p,null,NF),cl(d.p-d.c,null,NF)])});
+  const w3=X.utils.aoa_to_sheet(P);w3['!cols']=[{wch:26},{wch:18},{wch:18},{wch:20}];
+  X.utils.book_append_sheet(wb,w3,'Precios');
+  const K=[['Lista de stock para conteo físico'],[],['Producto','Cantidad inicial','Vendidos','Stock actual','Conteo físico','Diferencia']];
+  D.forEach((d,i)=>{const r=4+i;K.push([d.n,cl(d.q),cl(d.s),cl(d.q-d.s,'B'+r+'-C'+r),null,{t:'s',v:'',f:'IF(E'+r+'="","",E'+r+'-D'+r+')'}])});
+  const w4=X.utils.aoa_to_sheet(K);w4['!cols']=[{wch:28},{wch:16},{wch:12},{wch:14},{wch:15},{wch:13}];
+  X.utils.book_append_sheet(wb,w4,'Stock físico');
+  X.writeFile(wb,fname('xlsx'));
+  toast('Excel descargado');
+}
+function exportPdf(){
+  const J=window.jspdf;
+  if(!J||!J.jsPDF){toast('No se pudo cargar el generador de PDF. Revisá la conexión.');return}
+  const T=totals();
+  const doc=new J.jsPDF({orientation:'landscape',unit:'pt',format:'a4'});
+  if(typeof doc.autoTable!=='function'){toast('No se pudo cargar el generador de PDF. Revisá la conexión.');return}
+  const W=doc.internal.pageSize.getWidth(),ink=[29,27,22],mute=[98,93,83],gain=[13,111,83],cost=[168,67,14];
+  const fecha=new Date().toLocaleString('es-AR',{dateStyle:'long',timeStyle:'short'});
+  doc.setFont('helvetica','bold');doc.setFontSize(20);doc.setTextColor(...ink);doc.text('Inventario y ganancias',40,50);
+  doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(...mute);doc.text('Generado el '+fecha,40,68);
+  // Resumen en 4 bloques
+  const pct=T.C?Math.min(100,T.cash/T.C*100):0;
+  const sum=[['Costo total',m(T.C),cost],['Ingreso si vendés todo',m(T.R),ink],['Ganancia posible',m(T.R-T.C),gain],['Cobrado hasta ahora',m(T.cash)+'  ('+Math.round(pct)+'%)',ink]];
+  const bw=(W-80-30)/4;
+  sum.forEach(([l,v,c],k)=>{const x=40+k*(bw+10);doc.setDrawColor(228,223,211);doc.setFillColor(246,244,239);doc.roundedRect(x,86,bw,54,6,6,'FD');
+    doc.setFontSize(9);doc.setTextColor(...mute);doc.text(l,x+12,104);doc.setFont('helvetica','bold');doc.setFontSize(15);doc.setTextColor(...c);doc.text(v,x+12,127);doc.setFont('helvetica','normal')});
+  const body=T.rows.map(({d,c,rv})=>[d.n,nf(d.q),m(d.c),m(c),m(d.p),m(rv),m(rv-c),nf(d.s),nf(d.q-d.s)]);
+  const R=[1,2,3,4,5,6,7,8].reduce((o,k)=>(o[k]={halign:'right'},o),{});
+  doc.autoTable({startY:158,head:[['Producto','Cantidad','Costo c/u','Costo total','Precio c/u','Ingreso','Ganancia','Vendidos','Quedan']],body,
+    foot:[['Total',nf(T.Q),'',m(T.C),'',m(T.R),m(T.R-T.C),nf(T.S),nf(T.K)]],
+    theme:'plain',styles:{font:'helvetica',fontSize:9.5,cellPadding:6,textColor:ink,lineColor:[228,223,211],lineWidth:{bottom:.5}},
+    headStyles:{fillColor:[239,236,228],textColor:mute,fontStyle:'bold'},footStyles:{fillColor:[239,236,228],fontStyle:'bold'},
+    columnStyles:{0:{fontStyle:'bold'},...R},margin:{left:40,right:40},
+    didParseCell:h=>{['head','foot'].includes(h.section)&&h.column.index>0&&(h.cell.styles.halign='right');
+      if(h.section==='body'&&h.column.index===6)h.cell.styles.textColor=(T.rows[h.row.index].rv-T.rows[h.row.index].c)>=0?gain:cost}});
+  const s=D[T.si];
+  if(s){const ind=s.ind||0,pro=s.pro||0,pi=stPi(s),pp=stPp(s),cc=s.c;
+    let y=doc.lastAutoTable.finalY+28;if(y>doc.internal.pageSize.getHeight()-140){doc.addPage();y=50}
+    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(...ink);doc.text('Ventas de stickers y promos',40,y);
+    doc.autoTable({startY:y+10,head:[['Tipo de venta','Cantidad','Planchas','Cobrado','Ganancia','Ganancia por plancha']],
+      body:[['Sueltas ('+m(pi)+' c/u)',nf(ind),nf(ind),m(ind*pi),m(ind*(pi-cc)),m(pi-cc)],['Promos (2 por '+m(pp)+')',nf(pro),nf(2*pro),m(pro*pp),m(pro*pp-2*pro*cc),m(pp/2-cc)]],
+      foot:[['Total stickers','',nf(ind+2*pro),m(ind*pi+pro*pp),m(ind*(pi-cc)+pro*pp-2*pro*cc),'']],
+      theme:'plain',styles:{fontSize:9.5,cellPadding:6,textColor:ink,lineColor:[228,223,211],lineWidth:{bottom:.5}},
+      headStyles:{fillColor:[239,236,228],textColor:mute,fontStyle:'bold'},footStyles:{fillColor:[239,236,228],fontStyle:'bold'},
+      columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'}},margin:{left:40,right:40},tableWidth:520,
+      didParseCell:h=>{h.section!=='body'&&h.column.index>0&&(h.cell.styles.halign='right')}});
+    doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(...mute);
+    doc.text('Quedan '+nf(s.q-ind-2*pro)+' planchas. Descuento dado por promos: '+m((ind+2*pro)*pi-(ind*pi+pro*pp))+'.',40,doc.lastAutoTable.finalY+18);}
+  const pages=doc.getNumberOfPages();
+  for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFontSize(8.5);doc.setTextColor(...mute);doc.text('Página '+p+' de '+pages,W-40,doc.internal.pageSize.getHeight()-22,{align:'right'})}
+  doc.save(fname('pdf'));
+  toast('PDF descargado');
+}
+document.querySelectorAll('[data-x]').forEach(b=>b.addEventListener('click',()=>{
+  b.disabled=true;
+  setTimeout(()=>{try{b.dataset.x==='pdf'?exportPdf():exportXlsx()}catch(e){console.error(e);toast('No se pudo generar el archivo. Probá de nuevo.')}b.disabled=false},20);
+}));
+
+build();
+connect();
+</script>
+</body>
+</html>
